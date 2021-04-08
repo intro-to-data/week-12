@@ -1,0 +1,233 @@
+---
+title: "Logistic Regression"
+output: 
+  html_notebook:
+    toc: true
+    toc_float:
+      toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
+    theme: cerule
+---
+
+# Are We Automating Racism
+
+Someone on my team at work found this video and shared it on Slack.
+
+- https://www.youtube.com/watch?v=Ok5sKLXqynQ&vl=en
+- Reactions? Did this challenge how you in any way?
+- Also, this is a conversation that is probably easier if everyone who can turns on their camera.
+
+Conversely, this EXACT same property can be used to INCREASE the accuracy of models in some circumstances.
+
+- The model finds patterns in the data. Nothing more. Nothing less.
+- Say we wanted to predict the the risk of 30-day readmission. We would include:
+    - Patient Age
+    - Gender
+    - Race
+    - Reason for hospitalization
+    - Comorbidities
+- Should we include hospital or physician?
+    - We could, because there are patterns there.
+    - Albany Med has a higher readmit rate than other local hospitals.
+    - Certain doctors (within a unit/specialty) have higher readmit rates.
+    - We can use this information.
+        - But we have to be careful how we use it.
+        - Is this a performance issue or is it who gets assigned to which patient?
+    - Are you predicting or are you explaining?
+- Let's talk for a moment about race (because we need to)
+    - Not always an easy topic in medicine (Tuskeegee)
+    - And what we have isn't always accurate.
+         - Let's be honest, Medicaid doesn't even know where people live . . . . 
+    - Yet we know there are disparities. 
+    - https://healthitanalytics.com/news/medicare-beneficiaries-race-and-ethnicity-data-inaccurate
+
+
+
+# This Week's Lab
+
+- OMG, not even a single line of code.
+- Why?
+    - I, like many other educators, are trying (perhaps flailingly) to this moment.
+    - I believe, strongly, that if I tell you the numbers are always right, I am doing you a disservice.
+        - You can lie with numbers.
+        - Sometimes the numbers lie.
+        - Sometimes, it is both.
+- And you are adults. You have the right to vote and participate in our culture as adults.
+- It is not my job to tell you what to believe. It is my job to challenge you to develop informed beliefs.
+- You are all going to be out in the world soon. Working, creating data, consuming data. These topics should inform how you work with data as a professional and as a citizen.
+
+
+
+# Setup
+
+- A couple of weeks ago we created (several) decision trees to predict survival during the HMS Titanic disaster.
+- We will return to this data set (for the last time) to discus logistic regression.
+
+```{r setup}
+library(rpart)
+library(rpart.plot)
+library(knitr)
+library(modelr)
+library(tidyverse)
+train <- read_csv("data/train_clean.csv")
+train
+```
+
+And we saw that we could develop a reasonably good model for Titanic survival using decision trees and random forests.
+
+# Decision Trees
+
+```{r}
+cart_model <- rpart(survived~sex+age, data = train, method = "class")
+summary(cart_model)
+rpart.plot(cart_model)
+```
+
+- Most decision trees do not use odds ratios/risk ratios. They use gini impurity.
+    - You could, if you wanted to, calculate the odds ratio for every leaf on the tree (three in this case).
+- The model suggests sex is more important than age for predicting survival.
+- We could build a random forest now.
+    - The accuracy won't be any better than a decision tree because of the lack of depth/complexity of this tree.
+    - And, a random forest is less transparent than a decision tree.
+- Assess the accuracy of the model using a confusion matrix.
+
+```{r}
+## I've shown this code now several times, does it make sense?
+
+## Confusion Matrix
+train <- train %>% add_predictions(cart_model, type = "class") 
+train <-
+  train %>%
+  mutate(
+    pred_survived = as.numeric(levels(pred))[pred],
+    pred_not_survived = 1-as.numeric(levels(pred))[pred]
+  )
+confusion <- 
+  train %>%
+  group_by(survived) %>%
+  summarise(pred_survived = sum(pred_survived, na.rm = TRUE),
+            pred_not_survived = n() - sum(pred_survived, na.rm = TRUE)
+            )
+confusion
+
+## Accuracy
+accuracy <-
+  confusion %>% 
+  summarize(
+    ## This is just the total of right answers divided by the total number of rows.
+    (pred_survived[survived == 1] + pred_not_survived[survived == 0]) / nrow(train)
+  )
+accuracy * 100
+```
+
+- Remember, an accuracy of nearly 80% is good in many cases.
+    - No model is 
+- Part of the reason it is so accurate is because passenger survival was NOT random and was common enough to be easily predicted.
+- Random Forests often outperform decision trees where outcomes are more chaotic.
+- Prediction for rare events (below 15%) is often negatively impacted by sample size.
+    - And often requires boosting for many machine learning models.
+
+```{r}
+## This just removes our prior predictions.
+train <- train %>% select(-pred, -pred_survived, -pred_not_survived)
+```
+
+
+
+# Logistic Regression
+
+- Sometimes we develop a model for prediction.
+- Machine Learning models often excel at this.
+- Sometimes we develop a model for inference/understanding.
+- And for this, we often want to understand the size of the effect.
+- And this is especially important to the extent we want to understand the decisions made by the model.
+- And Logistic regression gives us this.
+
+## Simple Logistic Regression & Odds Ratios
+
+```{r}
+## We introduce a new function, glm, which builds the model.
+## But note that the structure of the function is quite similar to the decision tree.
+log_model <- glm(survived~sex, data = train, family = "binomial")
+summary(log_model)
+
+## Calculates the odds directly.
+## Let's find how they connect!
+train %>% 
+  group_by(sex) %>% 
+  summarize(
+    survived = sum(survived),
+    died = n()-sum(survived),
+    odds = survived/died,
+    log_odds = log(odds)
+  )
+```
+
+- Log odds are at the heart of logistic regression.
+- And log odds are simply the logarithm of the odds ratio.
+
+```{r}
+log_model$coefficients
+```
+
+- The log odds for a female are 1.056589
+- The log odds for a male are `r 1.056589 + -2.513710` if you allow for a smidge of rounding.
+- You read this just like you would a linear model.
+- Let's add age.
+
+```{r}
+log_model <- glm(survived~sex+age, data = train, family = "binomial")
+summary(log_model)
+```
+
+- For every unit increase in age, the odds of survival for a female are `exp(1.186908 + x*-0.004665)`
+- Male calculations are similar, but you throw in the adjustment for being male, which is rather significant.
+- https://www.statisticshowto.com/log-odds/
+- And, please note that this is the same formula we used in our decision tree.
+
+## Logistic Regression v Decision Tree
+
+- Our decision tree was 79.57351 percent accurate.
+- Is our logistic regression as accurate?
+
+```{r}
+## Confusion Matrix
+train <- 
+  train %>%
+  add_predictions(log_model) %>%
+  mutate(
+    pred_exp = exp(pred),
+    pred_survived = if_else(pred_exp >= 1, 1,0),
+    pred_not_survived = if_else(pred_exp < 1, 1,0),
+  )
+confusion <- 
+  train %>%
+  group_by(survived) %>%
+  summarise(pred_survived = sum(pred_survived, na.rm = TRUE),
+            pred_not_survived = n() - sum(pred_survived, na.rm = TRUE)
+            )
+confusion
+
+## Accuracy
+accuracy <-
+  confusion %>% 
+  summarize(
+    ## This is just the total of right answers divided by the total number of rows.
+    (pred_survived[survived == 1] + pred_not_survived[survived == 0]) / nrow(train)
+  )
+accuracy * 100
+```
+
+- Our logistic regression model is NEARLY as accurate as what we had before.
+    - Not bad for a technology that was maturing during the second world war.
+- Why the difference?
+    - Different methodology, different results.
+    - I could argue that the decision tree found the interaction between gender and age.
+    - However, even if we tweak our logistic regression model, the decision tree still wins.
+- Decision Trees are not necessarily better!
+    - The decision tree does out-perform logistic regression SLIGHTLY on this very simple example.
+    - Our 30-day readmission model uses logistic regression because it out-performs other models.
+    - There is no way to know which methodology will perform best on a given problem.
+        - And this is a methodological problem the entire ML world is facing.
+
