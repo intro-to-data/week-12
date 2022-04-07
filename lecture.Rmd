@@ -1,5 +1,5 @@
 ---
-title: "Logistic Regression"
+title: "Decision Trees"
 output: 
   html_notebook:
     toc: true
@@ -10,224 +10,430 @@ output:
     theme: cerule
 ---
 
-# Are We Automating Racism
-
-Someone on my team at work found this video and shared it on Slack.
-
-- https://www.youtube.com/watch?v=Ok5sKLXqynQ&vl=en
-- Reactions? Did this challenge how you in any way?
-- Also, this is a conversation that is probably easier if everyone who can turns on their camera.
-
-Conversely, this EXACT same property can be used to INCREASE the accuracy of models in some circumstances.
-
-- The model finds patterns in the data. Nothing more. Nothing less.
-- Say we wanted to predict the the risk of 30-day readmission. We would include:
-    - Patient Age
-    - Gender
-    - Race
-    - Reason for hospitalization
-    - Comorbidities
-- Should we include hospital or physician?
-    - We could, because there are patterns there.
-    - Albany Med has a higher readmit rate than other local hospitals.
-    - Certain doctors (within a unit/specialty) have higher readmit rates.
-    - We can use this information.
-        - But we have to be careful how we use it.
-        - Is this a performance issue or is it who gets assigned to which patient?
-    - Are you predicting or are you explaining?
-- Let's talk for a moment about race (because we need to)
-    - Not always an easy topic in medicine (Tuskeegee)
-    - And what we have isn't always accurate.
-         - Let's be honest, Medicaid doesn't even know where people live . . . . 
-    - Yet we know there are disparities. 
-    - https://healthitanalytics.com/news/medicare-beneficiaries-race-and-ethnicity-data-inaccurate
-
-
-
-# This Week's Lab
-
-- OMG, not even a single line of code.
-- Why?
-    - I, like many other educators, are trying (perhaps flailingly) to this moment.
-    - I believe, strongly, that if I tell you the numbers are always right, I am doing you a disservice.
-        - You can lie with numbers.
-        - Sometimes the numbers lie.
-        - Sometimes, it is both.
-- And you are adults. You have the right to vote and participate in our culture as adults.
-- It is not my job to tell you what to believe. It is my job to challenge you to develop informed beliefs.
-- You are all going to be out in the world soon. Working, creating data, consuming data. These topics should inform how you work with data as a professional and as a citizen.
-
-
 
 # Setup
 
-- A couple of weeks ago we created (several) decision trees to predict survival during the HMS Titanic disaster.
-- We will return to this data set (for the last time) to discus logistic regression.
-
-```{r setup}
+```{r include=FALSE}
 library(rpart)
 library(rpart.plot)
-library(knitr)
-library(modelr)
 library(tidyverse)
-train <- read_csv("data/train_clean.csv")
-train
+titanic <- read_csv("data/titanic-train-clean.csv") %>%
+  mutate(died = !survived) %>%
+  select(-survived)
 ```
 
-And we saw that we could develop a reasonably good model for Titanic survival using decision trees and random forests.
+# Data
 
-# Decision Trees
-
-```{r}
-cart_model <- rpart(survived~sex+age, data = train, method = "class")
-summary(cart_model)
-rpart.plot(cart_model)
-```
-
-- Most decision trees do not use odds ratios/risk ratios. They use gini impurity.
-    - You could, if you wanted to, calculate the odds ratio for every leaf on the tree (three in this case).
-- The model suggests sex is more important than age for predicting survival.
-- We could build a random forest now.
-    - The accuracy won't be any better than a decision tree because of the lack of depth/complexity of this tree.
-    - And, a random forest is less transparent than a decision tree.
-- Assess the accuracy of the model using a confusion matrix.
+`- Question: What type of data is pclass?
 
 ```{r}
-## I've shown this code now several times, does it make sense?
-
-## Confusion Matrix
-train <- train %>% add_predictions(cart_model, type = "class") 
-train <-
-  train %>%
-  mutate(
-    pred_survived = as.numeric(levels(pred))[pred],
-    pred_not_survived = 1-as.numeric(levels(pred))[pred]
-  )
-confusion <- 
-  train %>%
-  group_by(survived) %>%
-  summarise(pred_survived = sum(pred_survived, na.rm = TRUE),
-            pred_not_survived = n() - sum(pred_survived, na.rm = TRUE)
-            )
-confusion
-
-## Accuracy
-accuracy <-
-  confusion %>% 
-  summarize(
-    ## This is just the total of right answers divided by the total number of rows.
-    (pred_survived[survived == 1] + pred_not_survived[survived == 0]) / nrow(train)
-  )
-accuracy * 100
-```
-
-- Remember, an accuracy of nearly 80% is good in many cases.
-    - No model is 
-- Part of the reason it is so accurate is because passenger survival was NOT random and was common enough to be easily predicted.
-- Random Forests often outperform decision trees where outcomes are more chaotic.
-- Prediction for rare events (below 15%) is often negatively impacted by sample size.
-    - And often requires boosting for many machine learning models.
-
-```{r}
-## This just removes our prior predictions.
-train <- train %>% select(-pred, -pred_survived, -pred_not_survived)
+glimpse(titanic)
 ```
 
 
 
 # Logistic Regression
 
-- Sometimes we develop a model for prediction.
-- Machine Learning models often excel at this.
-- Sometimes we develop a model for inference/understanding.
-- And for this, we often want to understand the size of the effect.
-- And this is especially important to the extent we want to understand the decisions made by the model.
-- And Logistic regression gives us this.
-
-## Simple Logistic Regression & Odds Ratios
+- I want to return to logistic regression and highlight a limitation using logistic regression to perform classification.
+- But first we need to tweak our data.
+- Passenger Class (pclass) is a numeric data type with values 1, 2, and 3.
+    - But we should not treat it as a number.
+    - There is no class 1.4.
+    - And they are not ordinal either, not really.
+    - We should treat it as a factor, so we should turn it into a character.
 
 ```{r}
-## We introduce a new function, glm, which builds the model.
-## But note that the structure of the function is quite similar to the decision tree.
-log_model <- glm(survived~sex, data = train, family = "binomial")
-summary(log_model)
-
-## Calculates the odds directly.
-## Let's find how they connect!
-train %>% 
-  group_by(sex) %>% 
-  summarize(
-    survived = sum(survived),
-    died = n()-sum(survived),
-    odds = survived/died,
-    log_odds = log(odds)
-  )
+## Data skilz to the rescue.
+titanic <-
+  titanic %>%
+  mutate(pclass = as.character(pclass))
 ```
 
-- Log odds are at the heart of logistic regression.
-- And log odds are simply the logarithm of the odds ratio.
+- Otherwise, logistic regression will try to calculate the odds for every unit increase, which makes no sense.
+
+## Many Many Models
+
+- As you may recall, the odds of dieing as a man is higher than the odds of dieing as a woman.
+- And first class passengers were more likely to survive than anyone else.
+
+### Model 1
 
 ```{r}
-log_model$coefficients
+model_1 <- glm(died~sex, family = binomial, data = titanic)
+summary(model_1)
 ```
 
-- The log odds for a female are 1.056589
-- The log odds for a male are `r 1.056589 + -2.513710` if you allow for a smidge of rounding.
-- You read this just like you would a linear model.
-- Let's add age.
+- Call this our benchmark model.
+- Residual deviance is 917.8.
+
+### Model 2
 
 ```{r}
-log_model <- glm(survived~sex+age, data = train, family = "binomial")
-summary(log_model)
+model_2 <- glm(died~sex+pclass, family = binomial, data = titanic)
+summary(model_2)
 ```
 
-- For every unit increase in age, the odds of survival for a female are `exp(1.186908 + x*-0.004665)`
-- Male calculations are similar, but you throw in the adjustment for being male, which is rather significant.
-- https://www.statisticshowto.com/log-odds/
-- And, please note that this is the same formula we used in our decision tree.
+- Our residual deviance has dropped to 826.89.
+- That is a big decrease and you can really see why in the pclass 3 estimate.
+    - `r exp(1.9055)`
+    - For every first class passenger who died, nearly seven third class passengers died. After controlling for differences in gender.
 
-## Logistic Regression v Decision Tree
-
-- Our decision tree was 79.57351 percent accurate.
-- Is our logistic regression as accurate?
+### Model 3
 
 ```{r}
-## Confusion Matrix
-train <- 
-  train %>%
-  add_predictions(log_model) %>%
+model_3 <- glm(died~sex+pclass+age, family = binomial, data = titanic)
+summary(model_3)
+```
+- Our residual deviance drops to 725.18.
+- This is a much better inferential model than model_1.
+- We can see that getting older by a sigle year increases your odds `r exp(0.036212)` which really adds up for those of us over 18 or so.
+
+#### But, Classification
+
+- When we classify, we can only put people into two buckets, died/survived.
+- And we apply all of our criteria at once.
+- Watch this.
+
+```{r}
+## First we pull in the predicted values.
+titanic$model_1_odds <-
+  predict(newdata = titanic %>% mutate(died = NA), model_1) %>% exp()
+titanic$model_2_odds <-
+  predict(newdata = titanic %>% mutate(died = NA), model_2) %>% exp()
+titanic$model_3_odds <-
+  predict(newdata = titanic %>% mutate(died = NA), model_3) %>% exp()
+
+titanic <- 
+  titanic %>%
   mutate(
-    pred_exp = exp(pred),
-    pred_survived = if_else(pred_exp >= 1, 1,0),
-    pred_not_survived = if_else(pred_exp < 1, 1,0),
+    predicted_model_1 = case_when(model_1_odds > 1~1, TRUE~0),
+    predicted_model_2 = case_when(model_2_odds > 1~1, TRUE~0),
+    predicted_model_3 = case_when(model_3_odds > 1~1, TRUE~0)
   )
-confusion <- 
-  train %>%
-  group_by(survived) %>%
-  summarise(pred_survived = sum(pred_survived, na.rm = TRUE),
-            pred_not_survived = n() - sum(pred_survived, na.rm = TRUE)
-            )
-confusion
-
-## Accuracy
-accuracy <-
-  confusion %>% 
-  summarize(
-    ## This is just the total of right answers divided by the total number of rows.
-    (pred_survived[survived == 1] + pred_not_survived[survived == 0]) / nrow(train)
-  )
-accuracy * 100
 ```
 
-- Our logistic regression model is NEARLY as accurate as what we had before.
-    - Not bad for a technology that was maturing during the second world war.
-- Why the difference?
-    - Different methodology, different results.
-    - I could argue that the decision tree found the interaction between gender and age.
-    - However, even if we tweak our logistic regression model, the decision tree still wins.
-- Decision Trees are not necessarily better!
-    - The decision tree does out-perform logistic regression SLIGHTLY on this very simple example.
-    - Our 30-day readmission model uses logistic regression because it out-performs other models.
-    - There is no way to know which methodology will perform best on a given problem.
-        - And this is a methodological problem the entire ML world is facing.
+Confusion Matrix: Model 1
+
+```{r}
+titanic %>%
+  group_by(died) %>%
+  summarize(
+    predicted_died = sum(if_else(predicted_model_1 == 1, 1, 0)),
+    predicted_survived = sum(if_else(predicted_model_1 == 0, 1, 0))
+  )
+```
+
+- Accuracy: `r (468 + 233)/nrow(titanic)`
+
+Confusion Matrix: Model 2
+
+```{r}
+titanic %>%
+  group_by(died) %>%
+  summarize(
+    predicted_died = sum(if_else(predicted_model_2 == 1, 1, 0)),
+    predicted_survived = sum(if_else(predicted_model_2 == 0, 1, 0))
+  )
+```
+
+- Wait.
+- Model 2 was BETTER.
+- But the confusion matrix is identical.
+- Accuracy: `r (468 + 233)/nrow(titanic)`
+
+Confusion Matrix: Model 3
+
+```{r}
+titanic %>%
+  group_by(died) %>%
+  summarize(
+    predicted_died = sum(if_else(predicted_model_3 == 1, 1, 0)),
+    predicted_survived = sum(if_else(predicted_model_3 == 0, 1, 0))
+  )
+```
+
+- Accuracy: `r (365 + 251)/nrow(titanic)`
+- Our classification went, down.
+
+
+## So What Happened?
+
+- Our cut-off, odds > 1 was basically arbitrary, although rational.
+- And look at the values produced by our models.
+
+Model 1:
+
+```{r}
+titanic %>%
+  group_by(odds = model_1_odds) %>%
+  summarize(n = n()) %>%
+  mutate(odds_over_1 = if_else(odds > 1, TRUE, FALSE))
+
+ggplot(titanic, aes(x = model_1_odds)) +
+  geom_histogram() +
+  geom_vline(aes(xintercept = 1), color = "red")
+```
+
+Model 2:
+
+```{r}
+titanic %>%
+  group_by(odds = model_2_odds) %>%
+  summarize(n = n()) %>%
+  mutate(odds_over_1 = if_else(odds > 1, TRUE, FALSE))
+
+ggplot(titanic, aes(x = model_2_odds)) +
+  geom_histogram() +
+  geom_vline(aes(xintercept = 1), color = "red")
+```
+
+Model 3:
+
+```{r}
+titanic %>%
+  group_by(odds = model_3_odds) %>%
+  summarize(n = n()) %>%
+  mutate(odds_over_1 = if_else(odds > 1, TRUE, FALSE))
+
+ggplot(titanic, aes(x = model_3_odds)) +
+  geom_histogram() +
+  geom_vline(aes(xintercept = 1), color = "red")  
+```
+
+- And the two values are the odds of each gender dieing.
+
+```{r}
+titanic %>%
+  group_by(odds = exp(log_odds)) %>%
+  summarize(n = n())
+```
+
+# CaRT
+
+- AKA Decision Trees
+- The basic concepts of linear and logistic regression were first formulated in the first half of the 19th century.
+- And these concepts are still relevant and useful today.
+- Today we are going to turn our attention to a machine learning technique called a decision tree. These concepts were first introduced in the 1970s and the formal term Classification and Regression Tree (CaRT) was not coined until 1984.
+- So, much newer ideas.
+- We will use Titanic data to make it easier to see how this technique is similar to and different from logistic regression.
+- Let's watch a video about AI: https://www.youtube.com/embed/R9OHn5ZF4Uo
+
+```{r}
+## Let's just reset our data.
+titanic <- read_csv("data/titanic-train-clean.csv") %>%
+  select(-child) %>%
+  mutate(
+    ## Note, we are turning pclass into a character again.
+    pclass = as.character(pclass),
+    died = !survived) %>%
+  select(-survived)
+```
+
+## CaRT Model 1
+
+```{r}
+cart_model_1 <- rpart(died~sex, data = titanic, method = "class")
+summary(cart_model_1)
+rpart.plot(cart_model_1)
+```
+
+- One thing I like about decision trees is that they are graphical.
+- Decision trees focus on risk/purity, not on odds.
+- And we can use this model to make predictions.
+
+```{r}
+## Please note how this is ever so slightly different than what we did before.
+## This is one of the annoying things about R.
+titanic$cart_model_1_risk <-
+  predict(cart_model_1, newdata = titanic %>% mutate(died = NA))[,2]
+
+titanic <- 
+  titanic %>%
+  mutate(
+    ## Using a risk of .5 as the cut point is the same as using a odds of > 1.
+    predicted_cart_model_1 = case_when(cart_model_1_risk > .5~1, TRUE~0)
+  )
+
+titanic %>%
+  group_by(died) %>%
+  summarize(
+    predicted_died = sum(if_else(predicted_cart_model_1 == 1, 1, 0)),
+    predicted_survived = sum(if_else(predicted_cart_model_1 == 0, 1, 0))
+  )
+```
+
+- This matches our logistic regression model EXACTLY.
+- And that is important, because the results are often SIMILAR.
+- Although they work in very different ways.
+- As with all things in programming, more than one way to skin a cat.
+
+```
+# Confusion matrix using the same features via logistic regression.
+# A tibble: 2 × 3
+  died  predicted_died predicted_survived
+  <lgl>          <dbl>              <dbl>
+1 FALSE            109                233
+2 TRUE             468                 81
+```
+
+
+## CaRT Model 2
+
+```{r}
+cart_model_2 <- rpart(died~pclass, data = titanic, method = "class")
+summary(cart_model_2)
+rpart.plot(cart_model_2)
+```
+
+- Reading these is a little funky.
+- Every step/decision is called a branch.
+    - And this is always a boolean test (Yes/No or TRUE/FALSE).
+    - Yes always goes LEFT. No always goes RIGHT.
+    - GREEN leaves are classified as TRUE.
+    - BLUE leaves are classified as FALSE.
+    - The percent shown is the percent of the total population.
+    - The ratio shown is the ratio of that group which is TRUE.
+- Splits are decided on based on something called Gini Purity.
+     - At every point, what split can the computer make in the data to "purify" the data and get as many TRUES on one side?
+- The parts at the bottom are called "leaves".
+- It is a decision tree!
+
+## CaRT Model 3
+
+```{r}
+cart_model_3 <- rpart(died~sex+pclass, data = titanic, method = "class")
+summary(cart_model_3)
+rpart.plot(cart_model_3)
+```
+
+- Remember how our confusion matrix didn't change when we added pclass?
+- Well, this is telling us that adding pclass to a model with sex doesn't add any more purity to the classification.
+- So, although decision trees do overfit sometimes, they can also be useful for telling us what not to use.
+- I won't do a model here, since the whole point is that it ignored pclass, so it will be just like model 1.
+
+
+## CaRT Model 4
+
+```{r}
+cart_model_4 <- rpart(died~sex+pclass+age, data = titanic, method = "class")
+summary(cart_model_4)
+rpart.plot(cart_model_4)
+```
+
+- Please note how different features enter the model in different places.
+
+Now let's look at a prediction:
+
+```{r}
+titanic$cart_model_4_risk <-
+  predict(cart_model_4, newdata = titanic %>% mutate(died = NA))[,2]
+
+titanic <- 
+  titanic %>%
+  mutate(
+    ## Using a risk of .5 as the cut point is the same as using a odds of > 1.
+    predicted_cart_model_4 = case_when(cart_model_4_risk > .5~1, TRUE~0)
+  )
+
+titanic %>%
+  group_by(died) %>%
+  summarize(
+    predicted_died = sum(if_else(predicted_cart_model_4 == 1, 1, 0)),
+    predicted_survived = sum(if_else(predicted_cart_model_4 == 0, 1, 0))
+  )
+```
+
+- Now we can see the decision tree outperforming our logistic regression.
+- The number in our bottom left is way up and the number in our bottom right is way down.
+- For whatever reason in this data, the top row is unchanged. That's just a coincidence of this data. Don't reat anything into it.
+- But, we also have to start asking ourselves what part of this is "true" and what part is just a coincidence.
+
+```
+# Confusion matrix using the same features via logistic regression.
+# A tibble: 2 × 3
+  died  predicted_died predicted_survived
+  <lgl>          <dbl>              <dbl>
+1 FALSE             92                250
+2 TRUE             365                184
+```
+
+## CaRT Model OMG
+
+- So, let's just throw everything at it.
+- But, we want to only use numbers where it makes sense to do so.
+
+```{r}
+titanic <- titanic %>% select(passengerid:died)
+glimpse(titanic)
+```
+
+But I think the data types we have left all make "sense".
+
+```{r}
+cart_model_omg <- rpart(died~., data = titanic, method = "class")
+summary(cart_model_omg)
+rpart.plot(cart_model_omg)
+```
+
+- So, what happened here?
+
+```{r}
+titanic$cart_model_omg_risk <-
+  predict(cart_model_omg, newdata = titanic %>% mutate(died = NA))[,2]
+
+titanic <- 
+  titanic %>%
+  mutate(
+    ## Using a risk of .5 as the cut point is the same as using a odds of > 1.
+    predicted_cart_model_omg = case_when(cart_model_omg_risk > .5~1, TRUE~0)
+  )
+
+titanic %>%
+  group_by(died) %>%
+  summarize(
+    predicted_died = sum(if_else(predicted_cart_model_omg == 1, 1, 0)),
+    predicted_survived = sum(if_else(predicted_cart_model_omg == 0, 1, 0))
+  )
+```
+
+- You still have to use some common sense.
+- Decision trees exploit a pattern. ANY pattern.
+- Including "meaningless" things like names and passenger ids.
+- Let's try that again.
+
+```{r}
+## Resets us to the original columns.
+titanic <- titanic %>% select(passengerid:died)
+
+cart_model_omg <- rpart(
+  died~.,
+  ## Subtracts passenger id and name.
+  data = titanic %>% select(-passengerid, , -name, -ticket, -cabin),
+  method = "class")
+summary(cart_model_omg)
+rpart.plot(cart_model_omg)
+```
+
+- So we won't use passenger id, name, ticket, and cabin.
+
+```{r}
+titanic$cart_model_omg_risk <-
+  predict(cart_model_omg, newdata = titanic %>% mutate(died = NA))[,2]
+
+titanic <- 
+  titanic %>%
+  mutate(
+    ## Using a risk of .5 as the cut point is the same as using a odds of > 1.
+    predicted_cart_model_omg = case_when(cart_model_omg_risk > .5~1, TRUE~0)
+  )
+
+titanic %>%
+  group_by(died) %>%
+  summarize(
+    predicted_died = sum(if_else(predicted_cart_model_omg == 1, 1, 0)),
+    predicted_survived = sum(if_else(predicted_cart_model_omg == 0, 1, 0))
+  )
+```
+
+And now we have a model that has an accuracy of: `r (498 + 246)/nrow(titanic)`.
 

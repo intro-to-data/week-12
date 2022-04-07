@@ -1,0 +1,77 @@
+---
+title: "Decision Trees"
+output: 
+  html_notebook:
+    toc: true
+    toc_float:
+      toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
+    theme: cerule
+---
+
+
+# About this lab.
+
+- The first four questions are on Canvas alone.
+- We will return to our strokes data from the midterm and let's model it.
+- But first, a video: https://www.youtube.com/embed/R9OHn5ZF4Uo
+
+# Setup
+
+- Be sure to clean out you system. Hit the broom button.
+
+```{r}
+library(tidyverse)
+strokes <- read_csv("data/strokes.csv")
+```
+
+# Task 01
+
+```{r}
+glimpse(strokes)
+```
+
+- Question: Which column should be removed from strokes because it would be inappropriate to model against?
+- Answer:
+
+- Question: Which columns should be changed from numeric to character?
+- Answer: 
+
+- Question: Which column should be changed from a character column to a numeric?
+- Answer: 
+
+- Question: Can you please make these changes?
+
+```{r}
+## YOUR CODE HERE!!!
+## Yes, you are modeling, but you still have to do data munging/clean up.
+## And yes, this is totally normal.
+```
+
+# Task 02
+
+- Question: Develop a logistic regression model that predicts stroke. Try using gender, hypertension, and smoking_status. Which feature in this model should be removed because it is not statistically significant?
+- Answer: 
+
+
+```{r}
+## YOUR CODE HERE!!!
+```
+
+# Task 03
+
+- Question: Develop a decision tree model that predicts stroke. Try using gender, hypertension, and smoking_status. Did it result in a useful model?
+- Answer: 
+
+```{r}
+## YOUR CODE HERE!!!
+```
+
+And there-in lies the rub. Somewhere below 15%, random forests don't work very well. And the cut-off depends on the data.
+
+There is no single best model or method for classifying data. There are dozens of methods. We've discussed two in this class. But choosing the best method and features to efffectively classify data is hard. And it's a big, big world.
+
+Next week, the solution to this limitation and other challenges.
+
+Hint: You over-sample the minority cases.
