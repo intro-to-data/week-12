@@ -42,10 +42,10 @@ glimpse(strokes)
 ```
 
 - Question: Which column should be removed from strokes because it would be inappropriate to use in a inferential or predictive model?
-- Answer: 
+- Answer: id
 
 - Question: Which column should be changed from a character column to a numeric?
-- Answer: 
+- Answer: bmi
 
 - Question: Can you please make these changes?
 
@@ -56,7 +56,9 @@ Hint:
 - Yes, it is entirely normal to spend time cleaning up data before modeling.
 
 ```{r}
-## YOUR CODE HERE!!!
+strokes <-
+  strokes |>
+  mutate(bmi = as.numeric(bmi))
 ```
 
 
@@ -64,11 +66,13 @@ Hint:
 # Task 02
 
 - Question: Develop a logistic regression model that predicts stroke. Use gender, hypertension, and smoking_status to predict stroke. Which feature in this model should be removed because it is not statistically significant?
-- Answer: 
+- Answer: gender
 
 
 ```{r}
-## YOUR CODE HERE!!!
+glm_gender_hypertension_smoking_status <- 
+  glm(stroke ~ gender + hypertension + smoking_status, data = strokes)
+summary(glm_gender_hypertension_smoking_status)
 ```
 
 
@@ -81,13 +85,28 @@ Create a new model by removing the feature from the previous task which is not s
 - Answer: 
 
 ```{r}
-## YOUR CODE HERE!!!
 ## Use this code chunk to build your model and look at the summary.
+glm_hypertension_smoking_status <- 
+  glm(stroke ~ hypertension + smoking_status, data = strokes)
+summary(glm_hypertension_smoking_status)
 ```
 
 ```{r}
 ## Use this code chunk to predict strokes and build your confusion matrix.
-## YOUR CODE HERE!!!
+strokes <-
+  strokes |>
+  add_predictions(
+    glm_hypertension_smoking_status,
+    var = "glm_hypertension_smoking_status",
+    type = "response") |>
+  mutate(pred_hypertension_smoking_status = if_else(glm_hypertension_smoking_status > 0.5, 1, 0))
+
+strokes |>
+  group_by(stroke) |>
+  summarize(
+    pred_stroke = sum(pred_hypertension_smoking_status),
+    pred_not_stroke = sum(!pred_hypertension_smoking_status)
+  )
 ```
 
 
@@ -96,6 +115,7 @@ Create a new model by removing the feature from the previous task which is not s
 
 In epidemiology, a cutoff of 0.5 is often not ideal. Change your cut-off value to 0.05 and tell me the accuracy of the model.
 
+- Question: Using a cutoff value of 0.05, what is the accuracy of the model?
 - Answer: 
 
 Hint: You don't need to turn this into a percent. An accuracy between 0 and 1 is fine. Round to the nearest 100ths.
@@ -103,7 +123,21 @@ Hint: You don't need to turn this into a percent. An accuracy between 0 and 1 is
 While you are here, play around with cutoff values of 0.03 and 0.07 and observe how this alters the results. Just don't confuse these answers with the 0.05 cutoff.
 
 ```{r}
-## YOUR CODE HERE!!!
+## Use this code chunk to predict strokes and build your confusion matrix.
+strokes <-
+  strokes |>
+  add_predictions(
+    glm_hypertension_smoking_status,
+    var = "glm_hypertension_smoking_status",
+    type = "response") |>
+  mutate(pred_hypertension_smoking_status = if_else(glm_hypertension_smoking_status > 0.05, 1, 0))
+
+strokes |>
+  group_by(stroke) |>
+  summarize(
+    pred_stroke = sum(pred_hypertension_smoking_status),
+    pred_not_stroke = sum(!pred_hypertension_smoking_status)
+  )
 ```
 
 
@@ -118,7 +152,8 @@ Create a decision tree model that predicts stroke. Use gender, hypertension, and
 Hint: Feature is a machine learning term for column.
 
 ```{r}
-## YOUR CODE HERE!!!
+cart_gender_hpertension_smoking_status <- rpart(stroke ~ gender + hypertension + smoking_status, data = strokes)
+rpart.plot(cart_gender_hpertension_smoking_status)
 ```
 
 And there-in lies the rub. Rare events are hard to predict. In fact, understanding the relative risk (logistic regression) is actually easier than predicting exactly who will experience a stroke.
@@ -130,8 +165,9 @@ Task 06:
 Create a decision tree model which uses every possible feature in strokes, except id. Call it cart_omg
 
 - Question: The cart_omg model uses exactly one feature. What is it?
-- Answer: 
+- Answer: age
 
 ```{r}
-## YOUR CODE HERE!!!
+cart_omg <- rpart(stroke ~ ., data = strokes |> select(-id))
+rpart.plot(cart_omg)
 ```

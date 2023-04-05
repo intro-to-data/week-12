@@ -11,30 +11,175 @@ output:
 ---
 
 
+
+# Regression v Machine learning
+
+- Linear Regression has it's origins in the first decade of the 19th century.
+    - Method of Least Squares by Legendre (1805), Gauss (1809)
+    - In the early 20th century, this idea was debated and extended by mathematicians such as Yule, Pearson, and Fisher.
+    - In the 50's and 60's completing a single regression could take hours.
+- Logistic Regression has it's origins in the 1830s and 1840s. 
+    - The underlying idea was developed independently several times in different fields of study.
+    - Early applications included modeling autocatalytic reactions in chemistry and population growth.
+    - Bliss, Gaddum, and Fisher (he is everywhere!) extended these ideas in the 1930s. This work led to the probit model.
+        - Probit is a combination of the words probability and unit, prob + it
+    - 1940s when Berkson developed the logit function in 1944 which would eventually replace the probit function.
+        - Logit or log-odds is the logarithm of the odds p/(1-p) where p is the probability.
+        - Remember how I told you there was a relationship between the odds ratio and logistic regression?
+        - Well, that's it!
+- Although linear and logistic regression are POWERFUL techniques, they hard to apply to increasingly complex data.
+    - They are entirely appropriate in cases where the data is constrained in terms of complexity AND suitable domain experts are available.
+    - They can mislead when working with large data sets because it so easy to achieve statistical significance, which is often seen as a hallmark of a valid model.
+
+
+
 # Setup
 
 ```{r include=FALSE}
+library(modelr)
+library(rio)
 library(rpart)
 library(rpart.plot)
 library(tidyverse)
-titanic <- read_csv("data/titanic-train-clean.csv") %>%
-  mutate(died = !survived) %>%
+options(scipen = 999)
+
+titanic <- import("data/titanic-train-clean.csv") |>
+  mutate(died = !survived) |>
   select(-survived)
-```
-
-# Data
-
-`- Question: What type of data is pclass?
-
-```{r}
-glimpse(titanic)
 ```
 
 
 
 # Logistic Regression
 
-- I want to return to logistic regression and highlight a limitation using logistic regression to perform classification.
+- Last week, we did logistic regression.
+- Below, I will build the same simple model we did last week.
+- But first, we should look at the binomial distribution.
+  - Recall that 61.6 of passengers died.
+  - Below is a plot of a distribution that is exactly 50/50.
+  - There are automated ways to do this in R, but I thought a brute force approach might make sense.
+
+When I toss a coin it can land HEADS or TAILS up. We will toss our coin 15 times per trial. How easy is it to get a count of at least 10 heads out of 15 coin tosses?
+
+Hint: Not very likely.
+
+```{r}
+coin <- c("Heads", "Tails")
+trials <- 1:10000
+trial_counts <- tibble()
+
+for (t in trials) {
+  tosses <- sample(coin, 15, replace = TRUE)
+  trial_counts <- bind_rows(
+    trial_counts,
+    tibble(trial = t, n_heads = sum(tosses == "Heads"))
+  )
+}
+```
+
+Our 95% confidence intervals are . . . . (500/10,000)
+
+```{r}
+trial_counts |>
+  arrange(n_heads) |>
+  mutate(as_ordered = row_number()) |>
+  filter(as_ordered %in% c(250, 9750))
+```
+
+And we can see this in a couple of different ways:
+
+```{r}
+trial_counts |>
+  count(n_heads) |>
+  mutate(p = round(100 * n / sum(n), 1))
+```
+
+```{r }
+ggplot(trial_counts, aes(x = n_heads)) +
+  geom_bar(fill = "lightblue") +
+  geom_vline(xintercept = 4, color = "red") +
+  geom_vline(xintercept = 11, color = "red")
+```
+
+So, to answer our earlier question: 
+
+```{r}
+trial_counts |>
+  mutate(at_least_10 = if_else(n_heads >= 10, "Yes", "No")) |>
+  count(at_least_10) |>
+  mutate(p = round(100 * n / sum(n), 1))
+```
+
+In a nutshell, the p-value in a logistic regression tells us the percentage chance of the binomial distribution (for our sample size) for the null hypothesis will be more extreme than our sample.
+
+### Model 1
+
+We know that men were more likely to die.
+
+```{r}
+titanic |>
+  group_by(sex) |>
+  summarize(
+    n_passengers = n(),
+    n_died = sum(died),
+    p_died = 100 * n_died / n_passengers
+  )
+```
+
+In terms of modeling, our null hypothesis would be that men have the same chance as women of dying. Thus, how likely is it that we get an equally or more extreme outcome purely by chance?
+
+This code is a lot like what we did last time.
+
+- did_die is a macabre coin and represents our null hypothesis
+- I had to radically increase the number of trials.
+  - I recommend AGAINST running that part of the code on Posit Cloud.
+
+```{r}
+did_die <- c(rep("Died", 81), rep("Lived", 233))
+# In case it is hard to read, this is 100,000.
+# I tried to do it 1,000,000 times but gave up.
+trials <- 1:100000
+titanics <- tibble()
+
+for (t in trials) {
+  sank <- sample(did_die, 577, replace = TRUE)
+  titanics <- bind_rows(
+    titanics,
+    tibble(trial = t, how_many_died = sum(sank == "Died"))
+  )
+}
+
+titanics |>
+  mutate(extreme_deaths = if_else(how_many_died > 468, "Yes", "No")) |>
+  count(extreme_deaths) |>
+  mutate(p = 100 * n / sum(n))
+```
+
+So why did we do all that?
+
+1. I want to introduce the concept of sampling the $^*# out of things to replace hard ideas with simple ideas.
+2. To show how we can approach statistics DIFFERENTLY than Fisher, etc.
+  - Seriously, they would have killed someone to be able to do this.
+3. To help you understand what the p-value in this means.
+
+```{r}
+glm_sex <- glm(died ~ sex, family = binomial, data = titanic)
+summary(glm_sex)
+```
+
+- Intercept: `exp(-1.0566)`
+- sexmale: `exp(2.5137)` Note the EXTREMELY large number of 0s there.
+- Null deviance: How well the response variable can be predicted by a model with only the intercept term.
+- Residual deviance: How well the response variable can be predicted by a model with p predictor variables.
+  - Lower values tell us the model is better able to predict the response variable.
+  - But just chasing this can lead to overfitting.
+- AIC: Aikakae Information Criterion
+  - AIC uses a model's maximum likelihood estimation (log-likelihood) as a measure of fit.
+  - Log-likelihood is a measure of how likely one is to see their observed data, given a model. The model with the maximum likelihood is the one that “fits” the data the best. The natural log of the likelihood is used as a computational convenience.
+  - AIC is low for models with high log-likelihoods. This means the model fits the data better, which is what we want. But it adds a penalty term for models with higher parameter complexity, since more parameters means a model is more likely to overfit to the training data.
+  - https://builtin.com/data-science/what-is-aic
+
+Now we will build a few more models highlight a limitation of logistic regression for classification.
 - But first we need to tweak our data.
 - Passenger Class (pclass) is a numeric data type with values 1, 2, and 3.
     - But we should not treat it as a number.
@@ -45,81 +190,59 @@ glimpse(titanic)
 ```{r}
 ## Data skilz to the rescue.
 titanic <-
-  titanic %>%
-  mutate(pclass = as.character(pclass))
+  titanic |>
+  mutate(pclass = as.factor(pclass))
 ```
 
 - Otherwise, logistic regression will try to calculate the odds for every unit increase, which makes no sense.
 
-## Many Many Models
-
-- As you may recall, the odds of dieing as a man is higher than the odds of dieing as a woman.
-- And first class passengers were more likely to survive than anyone else.
-
-### Model 1
+## Model 2
 
 ```{r}
-model_1 <- glm(died~sex, family = binomial, data = titanic)
-summary(model_1)
+glm_sex_pclass <- glm(died ~ sex + pclass, family = binomial, data = titanic)
+summary(glm_sex_pclass)
 ```
 
-- Call this our benchmark model.
-- Residual deviance is 917.8.
-
-### Model 2
-
-```{r}
-model_2 <- glm(died~sex+pclass, family = binomial, data = titanic)
-summary(model_2)
-```
-
-- Our residual deviance has dropped to 826.89.
+- Note that the Null deviance doesn't change.
+- Our residual deviance has dropped from 917.8 to 826.89.
+- Our AIC went from 921.8 to 834.89
 - That is a big decrease and you can really see why in the pclass 3 estimate.
     - `r exp(1.9055)`
     - For every first class passenger who died, nearly seven third class passengers died. After controlling for differences in gender.
 
-### Model 3
-
-```{r}
-model_3 <- glm(died~sex+pclass+age, family = binomial, data = titanic)
-summary(model_3)
-```
-- Our residual deviance drops to 725.18.
-- This is a much better inferential model than model_1.
-- We can see that getting older by a sigle year increases your odds `r exp(0.036212)` which really adds up for those of us over 18 or so.
-
-#### But, Classification
+## But, Classification
 
 - When we classify, we can only put people into two buckets, died/survived.
 - And we apply all of our criteria at once.
 - Watch this.
 
 ```{r}
-## First we pull in the predicted values.
-titanic$model_1_odds <-
-  predict(newdata = titanic %>% mutate(died = NA), model_1) %>% exp()
-titanic$model_2_odds <-
-  predict(newdata = titanic %>% mutate(died = NA), model_2) %>% exp()
-titanic$model_3_odds <-
-  predict(newdata = titanic %>% mutate(died = NA), model_3) %>% exp()
-
-titanic <- 
-  titanic %>%
+titanic <-
+  titanic |>
+  add_predictions(
+    glm_sex,
+    var = "glm_sex",
+    type = "response"
+  ) |>
+  add_predictions(
+    glm_sex_pclass,
+    var = "glm_sex_pclass",
+    type = "response"
+  ) |>
   mutate(
-    predicted_model_1 = case_when(model_1_odds > 1~1, TRUE~0),
-    predicted_model_2 = case_when(model_2_odds > 1~1, TRUE~0),
-    predicted_model_3 = case_when(model_3_odds > 1~1, TRUE~0)
+    pred_glm_sex = if_else(glm_sex > .5, 1, 0),
+    pred_glm_sex_pclass = if_else(glm_sex_pclass > .5, 1, 0)
   )
 ```
 
 Confusion Matrix: Model 1
 
 ```{r}
-titanic %>%
-  group_by(died) %>%
+titanic |>
+  group_by(died) |>
   summarize(
-    predicted_died = sum(if_else(predicted_model_1 == 1, 1, 0)),
-    predicted_survived = sum(if_else(predicted_model_1 == 0, 1, 0))
+    pred_died = sum(if_else(pred_glm_sex == 1, 1, 0)),
+    pred_survived = sum(if_else(pred_glm_sex == 0, 1, 0))
   )
 ```
 
@@ -128,11 +251,11 @@ titanic %>%
 Confusion Matrix: Model 2
 
 ```{r}
-titanic %>%
-  group_by(died) %>%
+titanic |>
+  group_by(died) |>
   summarize(
-    predicted_died = sum(if_else(predicted_model_2 == 1, 1, 0)),
-    predicted_survived = sum(if_else(predicted_model_2 == 0, 1, 0))
+    pred_died = sum(if_else(pred_glm_sex_pclass == 1, 1, 0)),
+    pred_survived = sum(if_else(pred_glm_sex_pclass == 0, 1, 0))
   )
 ```
 
@@ -141,72 +264,12 @@ titanic %>%
 - But the confusion matrix is identical.
 - Accuracy: `r (468 + 233)/nrow(titanic)`
 
-Confusion Matrix: Model 3
-
-```{r}
-titanic %>%
-  group_by(died) %>%
-  summarize(
-    predicted_died = sum(if_else(predicted_model_3 == 1, 1, 0)),
-    predicted_survived = sum(if_else(predicted_model_3 == 0, 1, 0))
-  )
-```
-
-- Accuracy: `r (365 + 251)/nrow(titanic)`
-- Our classification went, down.
-
-
 ## So What Happened?
 
-- Our cut-off, odds > 1 was basically arbitrary, although rational.
+- Our cut-off, risk > .5 was basically arbitrary, although rational.
 - And look at the values produced by our models.
-
-Model 1:
-
-```{r}
-titanic %>%
-  group_by(odds = model_1_odds) %>%
-  summarize(n = n()) %>%
-  mutate(odds_over_1 = if_else(odds > 1, TRUE, FALSE))
-
-ggplot(titanic, aes(x = model_1_odds)) +
-  geom_histogram() +
-  geom_vline(aes(xintercept = 1), color = "red")
-```
-
-Model 2:
-
-```{r}
-titanic %>%
-  group_by(odds = model_2_odds) %>%
-  summarize(n = n()) %>%
-  mutate(odds_over_1 = if_else(odds > 1, TRUE, FALSE))
-
-ggplot(titanic, aes(x = model_2_odds)) +
-  geom_histogram() +
-  geom_vline(aes(xintercept = 1), color = "red")
-```
-
-Model 3:
-
-```{r}
-titanic %>%
-  group_by(odds = model_3_odds) %>%
-  summarize(n = n()) %>%
-  mutate(odds_over_1 = if_else(odds > 1, TRUE, FALSE))
-
-ggplot(titanic, aes(x = model_3_odds)) +
-  geom_histogram() +
-  geom_vline(aes(xintercept = 1), color = "red")  
-```
-
-- And the two values are the odds of each gender dieing.
-
-```{r}
-titanic %>%
-  group_by(odds = exp(log_odds)) %>%
-  summarize(n = n())
-```
+- But just look at how our predictions didn't change.
+  - `View(titanic)`
 
 # CaRT
 
@@ -214,75 +277,62 @@ titanic %>%
 - The basic concepts of linear and logistic regression were first formulated in the first half of the 19th century.
 - And these concepts are still relevant and useful today.
 - Today we are going to turn our attention to a machine learning technique called a decision tree. These concepts were first introduced in the 1970s and the formal term Classification and Regression Tree (CaRT) was not coined until 1984.
-- So, much newer ideas.
+  - +1 for newer ideas.
 - We will use Titanic data to make it easier to see how this technique is similar to and different from logistic regression.
-- Let's watch a video about AI: https://www.youtube.com/embed/R9OHn5ZF4Uo
 
 ```{r}
 ## Let's just reset our data.
-titanic <- read_csv("data/titanic-train-clean.csv") %>%
-  select(-child) %>%
+titanic <- import("data/titanic-train-clean.csv") |>
+  select(-child) |>
   mutate(
     ## Note, we are turning pclass into a character again.
     pclass = as.character(pclass),
-    died = !survived) %>%
+    died = !survived
+  ) |>
   select(-survived)
 ```
 
 ## CaRT Model 1
 
 ```{r}
-cart_model_1 <- rpart(died~sex, data = titanic, method = "class")
-summary(cart_model_1)
-rpart.plot(cart_model_1)
+cart_sex <- rpart(died ~ sex, data = titanic, method = "class")
+summary(cart_sex)
 ```
 
-- One thing I like about decision trees is that they are graphical.
-- Decision trees focus on risk/purity, not on odds.
+Honestly, nobody reads the summary of decision tree models. . . . because PLOTS!
+
+```{r}
+rpart.plot(cart_sex)
+```
+
+- I like the graphical nature of decision trees.
+- Decision trees focus on purity, not on odds.
 - And we can use this model to make predictions.
 
 ```{r}
-## Please note how this is ever so slightly different than what we did before.
-## This is one of the annoying things about R.
-titanic$cart_model_1_risk <-
-  predict(cart_model_1, newdata = titanic %>% mutate(died = NA))[,2]
+titanic <-
+  titanic |>
+  add_predictions(cart_sex, var = "pred_cart_sex", type = "class")
 
-titanic <- 
-  titanic %>%
-  mutate(
-    ## Using a risk of .5 as the cut point is the same as using a odds of > 1.
-    predicted_cart_model_1 = case_when(cart_model_1_risk > .5~1, TRUE~0)
-  )
-
-titanic %>%
-  group_by(died) %>%
+titanic |>
+  group_by(died) |>
   summarize(
-    predicted_died = sum(if_else(predicted_cart_model_1 == 1, 1, 0)),
-    predicted_survived = sum(if_else(predicted_cart_model_1 == 0, 1, 0))
+    ## Note the funny matching I have to do.
+    ## Sigh. Nothing is ever COMPLETELY consistent.
+    pred_died = sum(ifelse(pred_cart_sex == "TRUE", 1, 0)),
+    pred_survived = sum(ifelse(pred_cart_sex == "FALSE", 1, 0))
   )
 ```
 
 - This matches our logistic regression model EXACTLY.
 - And that is important, because the results are often SIMILAR.
 - Although they work in very different ways.
-- As with all things in programming, more than one way to skin a cat.
-
-```
-# Confusion matrix using the same features via logistic regression.
-# A tibble: 2 × 3
-  died  predicted_died predicted_survived
-  <lgl>          <dbl>              <dbl>
-1 FALSE            109                233
-2 TRUE             468                 81
-```
-
 
 ## CaRT Model 2
 
 ```{r}
-cart_model_2 <- rpart(died~pclass, data = titanic, method = "class")
-summary(cart_model_2)
-rpart.plot(cart_model_2)
+cart_pclass <- rpart(died ~ pclass, data = titanic, method = "class")
+rpart.plot(cart_pclass)
 ```
 
 - Reading these is a little funky.
@@ -293,7 +343,7 @@ rpart.plot(cart_model_2)
     - BLUE leaves are classified as FALSE.
     - The percent shown is the percent of the total population.
     - The ratio shown is the ratio of that group which is TRUE.
-- Splits are decided on based on something called Gini Purity.
+- Splits are decided on based on Gini Purity.
      - At every point, what split can the computer make in the data to "purify" the data and get as many TRUES on one side?
 - The parts at the bottom are called "leaves".
 - It is a decision tree!
@@ -301,23 +351,21 @@ rpart.plot(cart_model_2)
 ## CaRT Model 3
 
 ```{r}
-cart_model_3 <- rpart(died~sex+pclass, data = titanic, method = "class")
-summary(cart_model_3)
-rpart.plot(cart_model_3)
+cart_sex_pclass <- rpart(died ~ sex + pclass, data = titanic, method = "class")
+rpart.plot(cart_sex_pclass)
 ```
 
 - Remember how our confusion matrix didn't change when we added pclass?
 - Well, this is telling us that adding pclass to a model with sex doesn't add any more purity to the classification.
-- So, although decision trees do overfit sometimes, they can also be useful for telling us what not to use.
+- So, although decision trees overfit sometimes, they can also be useful for telling us what not to use.
 - I won't do a model here, since the whole point is that it ignored pclass, so it will be just like model 1.
 
 
 ## CaRT Model 4
 
 ```{r}
-cart_model_4 <- rpart(died~sex+pclass+age, data = titanic, method = "class")
-summary(cart_model_4)
-rpart.plot(cart_model_4)
+cart_sex_pclass_age <- rpart(died ~ sex + pclass + age, data = titanic, method = "class")
+rpart.plot(cart_sex_pclass_age)
 ```
 
 - Please note how different features enter the model in different places.
@@ -325,27 +373,22 @@ rpart.plot(cart_model_4)
 Now let's look at a prediction:
 
 ```{r}
-titanic$cart_model_4_risk <-
-  predict(cart_model_4, newdata = titanic %>% mutate(died = NA))[,2]
+titanic <-
+  titanic |>
+  add_predictions(cart_sex_pclass_age, var = "pred_cart_sex_pclass_age", type = "class")
 
-titanic <- 
-  titanic %>%
-  mutate(
-    ## Using a risk of .5 as the cut point is the same as using a odds of > 1.
-    predicted_cart_model_4 = case_when(cart_model_4_risk > .5~1, TRUE~0)
-  )
-
-titanic %>%
-  group_by(died) %>%
+titanic |>
+  group_by(died) |>
   summarize(
-    predicted_died = sum(if_else(predicted_cart_model_4 == 1, 1, 0)),
-    predicted_survived = sum(if_else(predicted_cart_model_4 == 0, 1, 0))
+    ## Note the funny matching I have to do.
+    ## Sigh. Nothing is ever COMPLETELY consistent.
+    pred_died = sum(if_else(pred_cart_sex_pclass_age == "TRUE", 1, 0)),
+    pred_survived = sum(if_else(pred_cart_sex_pclass_age == "FALSE", 1, 0))
   )
 ```
 
 - Now we can see the decision tree outperforming our logistic regression.
 - The number in our bottom left is way up and the number in our bottom right is way down.
-- For whatever reason in this data, the top row is unchanged. That's just a coincidence of this data. Don't reat anything into it.
 - But, we also have to start asking ourselves what part of this is "true" and what part is just a coincidence.
 
 ```
@@ -363,75 +406,47 @@ titanic %>%
 - But, we want to only use numbers where it makes sense to do so.
 
 ```{r}
-titanic <- titanic %>% select(passengerid:died)
+titanic <- titanic |> select(passengerid:died)
 glimpse(titanic)
 ```
 
 But I think the data types we have left all make "sense".
 
 ```{r}
-cart_model_omg <- rpart(died~., data = titanic, method = "class")
-summary(cart_model_omg)
+cart_model_omg <- rpart(died ~ ., data = titanic, method = "class")
 rpart.plot(cart_model_omg)
 ```
 
 - So, what happened here?
-
-```{r}
-titanic$cart_model_omg_risk <-
-  predict(cart_model_omg, newdata = titanic %>% mutate(died = NA))[,2]
-
-titanic <- 
-  titanic %>%
-  mutate(
-    ## Using a risk of .5 as the cut point is the same as using a odds of > 1.
-    predicted_cart_model_omg = case_when(cart_model_omg_risk > .5~1, TRUE~0)
-  )
-
-titanic %>%
-  group_by(died) %>%
-  summarize(
-    predicted_died = sum(if_else(predicted_cart_model_omg == 1, 1, 0)),
-    predicted_survived = sum(if_else(predicted_cart_model_omg == 0, 1, 0))
-  )
-```
-
 - You still have to use some common sense.
 - Decision trees exploit a pattern. ANY pattern.
 - Including "meaningless" things like names and passenger ids.
 - Let's try that again.
 
 ```{r}
-## Resets us to the original columns.
-titanic <- titanic %>% select(passengerid:died)
-
 cart_model_omg <- rpart(
-  died~.,
+  died ~ .,
   ## Subtracts passenger id and name.
-  data = titanic %>% select(-passengerid, , -name, -ticket, -cabin),
-  method = "class")
-summary(cart_model_omg)
+  data = titanic |> select(-passengerid, , -name, -ticket, -cabin),
+  method = "class"
+)
 rpart.plot(cart_model_omg)
 ```
 
 - So we won't use passenger id, name, ticket, and cabin.
 
 ```{r}
-titanic$cart_model_omg_risk <-
-  predict(cart_model_omg, newdata = titanic %>% mutate(died = NA))[,2]
+titanic <-
+  titanic |>
+  add_predictions(cart_model_omg, var = "pred_cart_model_omg", type = "class")
 
-titanic <- 
-  titanic %>%
-  mutate(
-    ## Using a risk of .5 as the cut point is the same as using a odds of > 1.
-    predicted_cart_model_omg = case_when(cart_model_omg_risk > .5~1, TRUE~0)
-  )
-
-titanic %>%
-  group_by(died) %>%
+titanic |>
+  group_by(died) |>
   summarize(
-    predicted_died = sum(if_else(predicted_cart_model_omg == 1, 1, 0)),
-    predicted_survived = sum(if_else(predicted_cart_model_omg == 0, 1, 0))
+    ## Note the funny matching I have to do.
+    ## Sigh. Nothing is ever COMPLETELY consistent.
+    pred_died = sum(if_else(pred_cart_model_omg == "TRUE", 1, 0)),
+    pred_survived = sum(if_else(pred_cart_model_omg == "FALSE", 1, 0))
   )
 ```
 
