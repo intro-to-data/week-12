@@ -42,11 +42,11 @@ titanic <-
 Task 01
 ================================================================================
 
-- **Question:** What is the log odds ratio of third class passengers to first
+- **Question:** What is the log odds ratio of third-class passengers to first
   class passengers?
 - **Answer:** 1.67
 
-- **Question:** What is the log odds ratio of second class passengers to first
+- **Question:** What is the log odds ratio of second-class passengers to first
   class passengers?
 - **Answer:** 0.64
 
@@ -83,15 +83,15 @@ Task 02
 - **Answer:** 1.67
 
 - **Question:** In a few sentences, tell me what this coefficient tells us about
-  the odds of a third class passenger surviving.
-- **Answer:** exp(1.6704) For every one first class passenger who died, over 
-  five and one/third, third class passengers died.
+  the odds of a third-class passenger surviving.
+- **Answer:** exp(1.6704) For every one first-class passenger who died, over 
+  five and one/third, third-class passengers died.
     - If they write this as 5 1/3, 5.3, or even five, they get credit for their
       answer.
 
-- **Question:** What does the intercept tell us? This is a once sentence answer,
+- **Question:** What does the intercept tell us? This is a one sentence answer,
   but you will have to see if you can deduce where this number comes from.
-- **Answer:** The intercept is the log odds of first class passengers.
+- **Answer:** The intercept is the log odds of first-class passengers.
 
 ```{r}
 

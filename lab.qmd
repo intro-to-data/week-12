@@ -42,29 +42,29 @@ titanic <-
 Task 01
 ================================================================================
 
-Another famous facet of the Titanic tragedy is that first and second class
-passengers were more likely to survive than third class passengers. Create a 
+Another famous facet of the Titanic tragedy is that first and second-class
+passengers were more likely to survive than third-class passengers. Create a 
 model which predicts death as a function of passenger class (`pclass`).
 
-I will go ahead and tell you that first class passengers were more likely to
+I will go ahead and tell you that first-class passengers were more likely to
 survive than any other passenger class. Therefore, we can calculate the odds 
-ratio for second and third class passengers, compared to first class passengers.
+ratio for second and third-class passengers, compared to first-class passengers.
 
-Using the odds of first class passengers as dying, calculate the odds ratio for
-second and third class passengers.
+Using the odds of first-class passengers as dying, calculate the odds ratio for
+second and third-class passengers.
 
-- **Question:** What is the log odds ratio of third class passengers to first
+- **Question:** What is the log odds ratio of third-class passengers to first
   class passengers?
 - **Answer:** 
 
-- **Question:** What is the log odds ratio of second class passengers to first
+- **Question:** What is the log odds ratio of second-class passengers to first
   class passengers?
 - **Answer:** 
 
 - Helpful Hints:
     - Use the column `pclass` to identify passenger class.
-    - Use the odds for first class passengers in the denominator.
-    - Use the odds for second class passengers in the numerator.
+    - Use the odds for first-class passengers in the denominator.
+    - Use the odds for second-class passengers in the numerator.
     - Calculate the log of this odds ratio.
     - The log of the odds ratio is very sensitive to rounding. But to make it 
       easier to enter into Canvas, I will only ask for the first two significant
@@ -91,10 +91,10 @@ coefficients for pclass2 and pclass3.
 - **Answer:** 
 
 - **Question:** In a few sentences, tell me what this coefficient tells us about
-  the odds of a third class passenger surviving.
+  the odds of a third-class passenger surviving.
 - **Answer:** 
 
-- **Question:** What does the intercept tell us? This is a once sentence answer,
+- **Question:** What does the intercept tell us? This is a one sentence answer,
   but you will have to see if you can deduce where this number comes from.
 - **Answer:** 
 - Helpful Hints:
