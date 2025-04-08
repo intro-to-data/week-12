@@ -1,3 +1,12 @@
-pkgs <- c("ROCR", "knitr", "modelr", "rio", "rmarkdown", "rpart", "rpart.plot", "shiny", "tidyverse")
+pkgs <- c(
+  "httpgd",
+  "knitr",
+  "rmarkdown",
+  "quarto",
+  "shiny",
+  "tidymodels",
+  "tidyverse"
+)
 install.packages(pkgs, dependencies = TRUE)
-unlink("lab-answers.Rmd")
+
+unlink("lab-answers.qmd")

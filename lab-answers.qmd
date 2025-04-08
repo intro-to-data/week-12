@@ -1,0 +1,189 @@
+---
+title: "Want to sink a boat?"
+format: html
+---
+
+
+
+Setup
+================================================================================
+
+- Hit the broom in your global environment pane to clear out your memory.
+- Then run this setup chunk to import the Titanic data into memory.
+
+```{r}
+#| label: setup
+#| echo: false
+#| warning: false
+
+library(tidymodels)
+library(tidyverse)
+options(scipen = 999)
+
+titanic <-
+  read_csv("data/titanic-train-clean.csv") |>
+  mutate(
+    pclass = factor(pclass),
+    child = relevel(
+      as.factor(if_else(child == 0, "No", "Yes")),
+      ref = "Yes"
+    ),
+    died = !survived,
+    died = relevel(
+      as.factor(if_else(died == TRUE, "died", "survived")),
+      ref = "survived"
+    )
+  ) |>
+  select(-survived)
+```
+
+
+
+Task 01
+================================================================================
+
+- **Question:** What is the log odds ratio of third class passengers to first
+  class passengers?
+- **Answer:** 1.67
+
+- **Question:** What is the log odds ratio of second class passengers to first
+  class passengers?
+- **Answer:** 0.64
+
+```{r}
+
+titanic |>
+  mutate(
+    .died = died == "died",
+    .survived = died == "survived"
+  ) |>
+  group_by(pclass) |>
+  summarize(
+    died = sum(.died),
+    survived = sum(.survived)
+  ) |>
+  mutate(
+    odds = died / survived
+  ) |>
+  summarise(
+    or_2 = odds[pclass == 2] / odds[pclass == 1],
+    log_odds_2 = log(or_2),
+    or_3 = odds[pclass == 3] / odds[pclass == 1],
+    log_odds_3 = log(or_3)
+  )
+
+```
+
+
+
+Task 02
+================================================================================
+
+- **Question:** What is the coefficient of pclass3?
+- **Answer:** 1.67
+
+- **Question:** In a few sentences, tell me what this coefficient tells us about
+  the odds of a third class passenger surviving.
+- **Answer:** exp(1.6704) For every one first class passenger who died, over 
+  five and one/third, third class passengers died.
+    - If they write this as 5 1/3, 5.3, or even five, they get credit for their
+      answer.
+
+- **Question:** What does the intercept tell us? This is a once sentence answer,
+  but you will have to see if you can deduce where this number comes from.
+- **Answer:** The intercept is the log odds of first class passengers.
+
+```{r}
+
+glm_pclass <-
+  logistic_reg() |>
+  fit(
+    died ~ pclass,
+    data = titanic
+  )
+glm_pclass
+
+```
+
+
+
+Task 03
+================================================================================
+
+- **Question**: What is the accuracy of your model from Task 02?
+- **Answer:** .6790123 OR 67.90.
+- Helpful Hints:
+    - You only need to enter this out to TWO significant digits.
+
+```{r}
+
+titanic_glm_pclass <-
+  augment(
+    glm_pclass,
+    new_data = titanic
+  )
+
+accuracy(
+  data = titanic_glm_pclass,
+  truth = died,
+  estimate = .pred_class
+)
+
+```
+
+
+
+Task 04
+================================================================================
+
+- **Question:** What is the accuracy of your new model, `glm_lab`?
+- **Answer:** .79 or 79.12
+
+- **Question:** Is this model more accurate, less accurate, or about the same
+  compared to model `glm_pclass`?
+- **Answer:** It is more accurate.
+
+- **Question:** Of the metrics I have taught you, sensitivity is the lowest. In
+  a single sentence, explain what the sensitivity metric is telling you about 
+  this model.
+- **Answer:** Of all passengers who died, this model only correctly identifies
+  69% of them.
+    - They must make reference to the value of sensitivity as 69% or .69 to get 
+      full credit here.
+
+```{r}
+glm_lab <-
+  logistic_reg() |>
+  fit(
+    died ~ pclass + child + sex,
+    data = titanic
+  )
+glm_lab
+
+titanic_glm_lab <-
+  augment(
+    glm_lab,
+    titanic
+  )
+
+
+conf_mat(titanic_glm_lab, truth = died, estimate = .pred_class)
+accuracy(titanic_glm_lab, truth = died, estimate = .pred_class)
+sensitivity(titanic_glm_lab, truth = died, estimate = .pred_class)
+specificity(titanic_glm_lab, truth = died, estimate = .pred_class)
+
+```
+
+
+
+Task 05
+================================================================================
+
+- **Question:** Based on everything you have seen in this lecture and lab, do
+  you think the adage "women and children first" is an accurate description for 
+  who was saved when Titanic sank?
+- **Answer:** Yes and no. Women and children were more likely to survive, but
+  passenger class was also highly predictive. It's like they left that that part
+  out.
+    - This is an experimental question and I'm not sure what we are going to get.
+    - We can discuss how to grade this one together.

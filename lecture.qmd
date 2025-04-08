@@ -1,0 +1,458 @@
+---
+title: "Anyone want to sink a boat?"
+format: html
+---
+
+
+
+Goals
+================================================================================
+
+- Review of Risk, Odds.
+    - Including how to calculate when the outcome is NOT a 1/0 column.
+- Review of Odds Ratio
+- Calculate Log Odds Ratio (which I tend to just call log odds).
+- Introduce Logistic Regression
+- Evaluation of Logistic Regression
+
+
+
+A brief history
+--------------------------------------------------------------------------------
+
+- Logistic Regression has it's origins in the 1830s and 1840s.
+    - The underlying idea was developed independently several times in different
+      fields of study.
+    - Early applications included modeling autocatalytic reactions in chemistry
+      and population growth.
+- Bliss, Gaddum, and Fisher (he is everywhere!) extended these ideas in the
+  1930s. This work led to the probit model.
+    - Probit is a combination of the words probability and unit, prob + it.
+    - Calculating the probit is beyond the scope of this class.
+- Berkson developed the sigmoid/logistic/logit function in 1944 which would 
+  eventually replace the probit function.
+    - Logit or log-odds is the logarithm of the odds p/(1-p) where p is the
+      probability.
+    - Remember how I told you there was a relationship between the odds
+      ratio and logistic regression?
+    - Now I have to demonstrate this.
+
+
+Setup
+--------------------------------------------------------------------------------
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidymodels)
+library(tidyverse)
+options(scipen = 999)
+
+# This is our data pipeline for this data set.
+# We are going to predict the risk of dieing, not surviving.
+titanic <-
+  read_csv("data/titanic-train-clean.csv") |>
+  mutate(
+    pclass = factor(pclass),
+    child = relevel(
+      as.factor(if_else(child == 0, "No", "Yes")),
+      ref = "Yes"
+    ),
+    died = !survived,
+    died = relevel(
+      as.factor(if_else(died == TRUE, "died", "survived")),
+      ref = "survived"
+    )
+  ) |>
+  select(-survived)
+
+```
+
+
+
+Titanic Risk, Odds
+================================================================================
+
+I wonder, how does this story end? . . . 
+
+> RMS Titanic was a British passenger and mail carrying ocean liner, operated by
+> the White Star Line, that sank in the North Atlantic Ocean on 15 April 1912 as
+> a result of striking an iceberg during her maiden voyage from Southampton,
+> England, to New York City, United States. Of the estimated 2,224 passengers
+> and crew aboard, about 1,500 died, making it the deadliest sinking of a single
+> ship up to that time. The disaster drew public attention, spurred major
+> changes in maritime safety regulations, and inspired many artistic works.
+>
+> -- [Wikipedia](https://en.wikipedia.org/wiki/Titanic)
+
+This lets us estimate some variables:
+
+- `n_died`: 1500 The number of passengers & crew who died, rounded off.
+- `total_complement`: 2224 The total complement of passengers.
+- `n_survived`: 724 The number of passengers & crew who survived.
+    - `total_complement` - `n_died`
+
+You don't need to be a statistician to see this was a rough night.
+
+Risk
+--------------------------------------------------------------------------------
+
+We have enough information to estimate the risk of death.
+
+$$Risk = \frac {n\_died} {total\_complement}$$
+
+Which translates to:
+
+$$.6745 = \frac{1,500} {2,224}$$
+
+- Therefore, we could say that roughly 67% of the passengers and crew died that
+  night.
+- I would not use any significant digits because our numerator has ??? rounding.
+- I might even say we can estimate that between 60 and 70 percent of passengers
+  and crew died. Don't let precision be confused for accuracy.
+
+
+Odds
+--------------------------------------------------------------------------------
+
+$$Odds = \frac {n\_died} {n\_survived}$$
+
+Which translates to:
+
+$$2.07 = \frac {1,500}{(2,224-1,500)}$$
+
+This is read as for every one person who survived the sinking of Titanic,
+slightly more than two people died.
+
+Recall:
+
+- Risk ~ Odds for rare events.
+- Because death was _not_ rare that evening, Risk !~ Odds
+
+**Note:**
+
+- The data we are using. `titanic`, is a SAMPLE of the total passenger manifest.
+- With only 891 _passengers_, our numbers will not match the above.
+
+
+
+Calculating Odds, Odds Ratio, Log Odds
+================================================================================
+
+If you know _anything_ about the tragedy of the Titanic, you have heard the
+phrase, women and children first! But is it true? Let's express these as 
+questions of odds ratios!
+
+Odds Ratio: Sex
+--------------------------------------------------------------------------------
+
+- **Question:** Were males more likely to die than females? If yes, how much more
+  likely (Odds Ratio)?
+- **Answer:** 
+- Helpful Hints:
+    - The data we have is a sample of the total passenger manifest and only 
+      includes 891 passengers.
+    - Our outcome, `died`, is NOT a Boolean (TRUE/FALSE) or Integer (1/0) 
+      column.
+    - We will mutate to create some new columns which do give us TRUE/FALSE
+      values.
+    - Create a dataframe called `odds_sex`.
+    
+Please take a moment to calculate:
+
+1. The odds of dying for males and females (separately).
+2. The odds ratio for males to females to determine if males were more likely to die
+   and if so, how much more likely were they to die?
+
+```{r}
+
+odds_sex <-
+  titanic |>
+  select(passengerid, sex, died) |>
+  mutate(
+    .died = died == "died",
+    .survived = died == "survived"
+  ) |>
+  group_by(sex) |>
+  summarise(died = sum(.died), survived = sum(.survived)) |>
+  mutate(odds = died/survived)
+
+odds_sex
+
+```
+
+
+```{r}
+
+odds_sex |> 
+  summarize(
+    OR = odds[sex == "male"] / odds[sex == "female"]
+)
+
+```
+
+
+Odds Ratio: Child
+--------------------------------------------------------------------------------
+
+Calculate this one on your own and we will review on Friday.
+
+- **Question:** Were adults more likely to die than children? If yes, how much
+  more likely (Odds Ratio)?
+- **Answer:** 
+- Helpful Hints:
+    - There is a column called `age`.
+    - But it is easier to use the column `child`.
+    - Create a dataframe called odds_child.
+
+Please take a moment to calculate:
+
+1. The odds of dying for adults and children (child == No).
+2. The odds ratio for adults to children to determine if adults were more likely
+   to die and if so, how much more likely were they to die?
+
+
+```{r}
+
+## YOUR CODE HERE (Odds) !!!
+
+```
+
+
+```{r}
+
+## YOUR CODE HERE (Odds Ratio)!!!
+
+```
+
+
+
+Log Odds
+================================================================================
+
+The log odds is connected to logistic regression.
+
+```{r}
+#| eval: false
+
+odds_sex |> summarize(OR = odds[sex == "male"] / odds[sex == "female"])
+
+```
+
+Since our odds are 12.35066 . . . our log odds are . . . 
+
+```{r}
+# Note: There is some rounding going on here!
+log(12.35066)
+```
+
+Can you calculate the log odds for odds_child?
+
+```{r}
+
+## YOUR CODE HERE!!!
+
+```
+
+
+
+Logistic Regression
+================================================================================
+
+- Logistic regression is a classifier model. 
+    - Linear regression predicts a _value_.
+    - Logistic regression predicts a _probability_.
+- Logistic regression is used to predict a binary outcome.
+    - The dependent variable is always binary.
+    - Two outcomes, mutually exclusive.
+    - In our example, we can build a model to predict who lives and who dies,
+      but we cannot also predict that someone will survive but be badly
+      injured. That would have to be a separate model.
+- Uses the sigmoid/logit/logistic function to transform the predictor
+  variables into a probability between 0 and 1.
+- Once converted, the probability (log odds) is a linear regression of this 
+  sigmoid function.
+
+Sigmoid Function: 
+
+- Converts a continuous variable to a value between 0 and 1.
+- Converts a factor variable (sex) to a value of 1 or 0.
+    - sexMale
+
+$$\sigma(z) = \frac{1} {1 + e^{-z}}$$
+
+But, how is logistic regression linear? Well, the linear is hidden inside. 
+_(This is why we do linear regression first!)_
+
+Simple Logistic Regression:
+
+$$\sigma(died) = \frac{e^{x_0 + x_1 sex}} {1 + e^{x_0 + x_1 sex}}$$
+
+Our linear regression model is hiding in the exponent of e.
+
+And . . . now . . . let's build some models!
+
+## Model 1: died ~ sex
+
+We know being male was a risk factor. Let's show this using logistic regression.
+
+The code for creating a logistic regression model should be familiar.
+
+```{r}
+
+glm_sex <-
+  logistic_reg() |>
+  fit(
+    died ~ sex,
+    data = titanic
+  )
+glm_sex
+
+```
+
+As with linear regression, we can see a "tidy" version of this:
+
+```{r}
+# Ha ha . . . enjoy the p.value!
+tidy(glm_sex)
+```
+
+- sexmale: `exp(2.5137)`
+
+And we can do some predictions.
+
+```{r}
+
+titanic_glm_sex <- 
+  glm_sex |>
+  augment(new_data = titanic)
+
+titanic_glm_sex |>
+  select(
+    passengerid,
+    .pred_class,
+    .pred_survived,
+    .pred_died,
+    sex,
+    died
+  )
+
+```
+
+## Model 2: died ~ child
+
+Build your own model `glm_child` which models the log odds of dying as 
+a function of being a child/adult.
+
+- **Question:** What is the coefficient of `childNo`?
+- **Answer:**  
+
+```{r}
+
+## YOUR CODE HERE (glm_child) !!!
+
+```
+
+
+
+Model Evaluation
+================================================================================
+
+We can evaluate our model with something called a **Confusion Matrix**. This 
+helps us understand how well the model is actually predicting our outcome.
+
+- The confusion matrix is the data structure which drives some model criteria
+  you may recognize:
+    - Accuracy
+    - Sensitivity
+    - Specificity
+- But first we have to figure out how to read this blasted thing.
+
+```{r}
+
+# Believe it or not, this is easier!
+conf_mat(
+  titanic_glm_sex,
+  truth = died,
+  estimate = .pred_class
+)
+
+```
+
+TP: True Positive <- Good (468)
+TN: True Negative <- Good (233)
+FN: False Negative <- Swing and a miss! (81)
+FP: False Positive <- Swing and a miss! (109)
+
+```
+            Truth
+Prediction  survived   died
+  survived       *TN*   FN
+  died            FP   *TP*
+```
+
+- Top Left and Bottom Right are SUCCESSFUL PREDICTIONS.
+- The tidymodels folks have . . . some . . . odd conventions here.
+
+
+Accuracy:
+-------------------------------------------------------------------------------
+
+Number of correct guesses/Total number of guesses.
+
+$$\frac {(TP + TN)}  {(TP + TN + FN + FP)}$$
+
+```{r}
+accuracy(
+  titanic_glm_sex,
+  truth = died,
+  estimate = .pred_class
+)
+```
+
+```{r}
+(233 + 468)/(233 + 468 + 109 + 81)
+```
+
+
+Sensitivity:
+-------------------------------------------------------------------------------
+
+Percentage of all positives identified by the model.
+
+$$\frac {TP} {TP + FN}$$
+
+```{r}
+sensitivity(
+  titanic_glm_sex,
+  truth = died,
+  estimate = .pred_class
+)
+```
+
+```{r}
+233/(233 + 109)
+```
+
+
+Specificity:
+-------------------------------------------------------------------------------
+
+Percentage of all negatives (survived) identified by the model.
+
+$$\frac {TN} {TN + FP}$$
+
+```{r}
+
+specificity(
+  titanic_glm_sex,
+  truth = died,
+  estimate = .pred_class
+)
+
+```
+
+```{r}
+468/(468 + 81)
+```

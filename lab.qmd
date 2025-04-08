@@ -1,0 +1,184 @@
+---
+title: "Want to sink a boat?"
+format: html
+---
+
+
+
+Setup
+================================================================================
+
+- Hit the broom in your global environment pane to clear out your memory.
+- Then run this setup chunk to import the Titanic data into memory.
+
+```{r}
+#| label: setup
+#| echo: false
+#| warning: false
+
+library(tidymodels)
+library(tidyverse)
+options(scipen = 999)
+
+titanic <-
+  read_csv("data/titanic-train-clean.csv") |>
+  mutate(
+    pclass = factor(pclass),
+    child = relevel(
+      as.factor(if_else(child == 0, "No", "Yes")),
+      ref = "Yes"
+    ),
+    died = !survived,
+    died = relevel(
+      as.factor(if_else(died == TRUE, "died", "survived")),
+      ref = "survived"
+    )
+  ) |>
+  select(-survived)
+```
+
+
+
+Task 01
+================================================================================
+
+Another famous facet of the Titanic tragedy is that first and second class
+passengers were more likely to survive than third class passengers. Create a 
+model which predicts death as a function of passenger class (`pclass`).
+
+I will go ahead and tell you that first class passengers were more likely to
+survive than any other passenger class. Therefore, we can calculate the odds 
+ratio for second and third class passengers, compared to first class passengers.
+
+Using the odds of first class passengers as dying, calculate the odds ratio for
+second and third class passengers.
+
+- **Question:** What is the log odds ratio of third class passengers to first
+  class passengers?
+- **Answer:** 
+
+- **Question:** What is the log odds ratio of second class passengers to first
+  class passengers?
+- **Answer:** 
+
+- Helpful Hints:
+    - Use the column `pclass` to identify passenger class.
+    - Use the odds for first class passengers in the denominator.
+    - Use the odds for second class passengers in the numerator.
+    - Calculate the log of this odds ratio.
+    - The log of the odds ratio is very sensitive to rounding. But to make it 
+      easier to enter into Canvas, I will only ask for the first two significant
+      digits. From there, follow standard rounding rules.
+    - However, when calculating the `log()` or `exp()` of a number, use all
+      available digits.
+
+```{r}
+
+## YOUR CODE HERE!!!
+
+```
+
+
+
+Task 02
+================================================================================
+
+Create a logistic regression model which predicts death as a function of 
+passenger class (`pclass`). This model should return an intercept, and 
+coefficients for pclass2 and pclass3.
+
+- **Question:** What is the coefficient of pclass3?
+- **Answer:** 
+
+- **Question:** In a few sentences, tell me what this coefficient tells us about
+  the odds of a third class passenger surviving.
+- **Answer:** 
+
+- **Question:** What does the intercept tell us? This is a once sentence answer,
+  but you will have to see if you can deduce where this number comes from.
+- **Answer:** 
+- Helpful Hints:
+    - Your work on Task 01 is relevant for figuring this out!
+    - There's one group missing . . . 
+
+```{r}
+
+## YOUR CODE HERE!!!
+
+```
+
+
+
+Task 03
+================================================================================
+
+- **Question**: What is the accuracy of your model from Task 02?
+- **Answer:** 
+- Helpful Hints:
+    - You only need to enter this out to TWO significant digits.
+
+```{r}
+
+## YOUR CODE HERE!!!
+
+```
+
+
+
+Task 04
+================================================================================
+
+In the lecture, we built a model using `sex` and we built a model using `child`.
+These were "simple" logistic regression models because the probability of dying
+was calculated as a function of a single feature. As with linear regression, we
+can build multiple logistic regression models which use multiple features.
+
+Build a model called glm_lab which predicts the probability of death as a 
+function of:
+
+- Passenger Class `pclass`
+- Child/Adult `child`
+- Sex `sex`
+
+The order in which you list the features does not matter to the end result.
+After building the model, review the confusion matrix, accuracy, sensitivity,
+and specificity of this new model.
+
+- **Question:** What is the accuracy of your new model, `glm_lab`?
+- **Answer:** 
+
+- **Question:** Is this model more accurate, less accurate, or about the same
+  compared to model `glm_pclass`?
+- **Answer:** 
+
+- **Question:** Of the metrics I have taught you, sensitivity is the lowest. In
+  a single sentence, explain what the sensitivity metric is telling you about 
+  this model.
+- **Answer:** 
+- Helpful Hints: 
+    - Use the sensitivity percent calculated by R as part of your answer.
+    - If you don't, you won't get full credit.
+
+
+```{r}
+
+## YOUR CODE HERE!!!
+
+```
+
+
+
+Task 05
+================================================================================
+
+Please signal to me when you get to this task.
+
+- **Question:** Based on everything you have seen in this lecture and lab, do
+  you think the adage "women and children first" is an accurate description for 
+  who was saved when Titanic sank?
+- **Answer:**
+- Helpful Hints:
+    - Use the numbers we calculated in the lecture and in the lab to support
+      your answer.
+    - Please don't write a five-paragraph theme. A few sentences, supported by 
+      data is sufficient.
