@@ -111,7 +111,7 @@ Task 03
 ================================================================================
 
 - **Question**: What is the accuracy of your model from Task 02?
-- **Answer:** .6790123 OR 67.90.
+- **Answer:** .68 OR 67.90.
 - Helpful Hints:
     - You only need to enter this out to TWO significant digits.
 
